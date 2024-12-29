@@ -1,54 +1,96 @@
-import { TableProps } from "./types";
+import { useMemo } from "react";
+import type { Key, TableProps } from "./types";
+import { useTable } from "./hooks/useTable";
+import { TableHeader } from "./tableHeader";
+import { TableBody } from "./tableBody";
+import { TablePagination } from "./tablePagination";
 
-export function Table<T extends Record<string, any>>({
+export function Table<TData extends object>({
   columns,
-  data,
-  loading = false,
-  rowKey = "id",
-}: TableProps<T>) {
-  if (loading) {
-    return <div>Loading...</div>;
-  }
+  dataSource,
+  rowKey,
+  pagination = undefined,
+  bordered = false,
+  size = "middle",
+}: TableProps<TData>) {
+  const {
+    tableData,
+    currentPage,
+    pageSize,
+    totalPages,
+    sortedInfo,
+    setCurrentPage,
+    setPageSize,
+    setSortedInfo,
+  } = useTable({
+    columns,
+    dataSource,
+    pagination: pagination || undefined,
+  });
+
+  const getRowKey = useMemo(() => {
+    if (typeof rowKey === "function") {
+      return rowKey;
+    }
+    return (record: TData) => {
+      if (!rowKey) {
+        return JSON.stringify(record);
+      }
+      const key = record[rowKey];
+      return (key !== undefined ? key : JSON.stringify(record)) as Key;
+    };
+  }, [rowKey]);
+
+  const sizeClasses = useMemo(
+    () => ({
+      small: "text-sm",
+      middle: "text-base",
+      large: "text-lg",
+    }),
+    [],
+  );
 
   return (
-    <div className="overflow-x-auto ">
-      <table className="min-w-full border rounded-sm">
-        <thead className="bg-gray-50">
-          <tr>
-            {columns.map((column) => (
-              <th
-                className={`px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${
-                  column.align ? `text-${column.align}` : ""
-                }`}
-                style={{ width: column.width }}
-                key={column.key}
-              >
-                {column?.title}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody className="bg-white divide-y divide-gray-200">
-          {data.map((row) => (
-            <tr key={typeof rowKey === "function" ? rowKey(row) : row[rowKey]}>
-              {columns.map((column) =>
-                column.render ? (
-                  column.render(row[column.dataIndex], row)
-                ) : (
-                  <td
-                    key={column.key}
-                    className={`px-6 py-4 whitespace-nowrap ${
-                      column.align ? `text-${column.align}` : "text-left"
-                    }`}
-                  >
-                    {row[column.dataIndex]}
-                  </td>
-                ),
-              )}
-            </tr>
-          ))}
-        </tbody>
-      </table>
+    <div className="w-full">
+      <div
+        className={`
+          relative
+          overflow-x-auto
+          ${bordered ? "border border-gray-200 rounded-lg" : ""}
+        `}
+      >
+        <table
+          className={`
+            w-full
+            border-collapse
+            ${sizeClasses[size]}
+          `}
+        >
+          <TableHeader<TData>
+            columns={columns}
+            sortedInfo={sortedInfo}
+            setSortedInfo={setSortedInfo}
+            size={size}
+          />
+          <TableBody<TData>
+            columns={columns}
+            dataSource={tableData}
+            getRowKey={getRowKey}
+            size={size}
+          />
+        </table>
+      </div>
+
+      {pagination && totalPages > 1 && (
+        <TablePagination
+          currentPage={currentPage}
+          pageSize={pageSize}
+          totalPages={totalPages}
+          setCurrentPage={setCurrentPage}
+          setPageSize={setPageSize}
+          size={size}
+        />
+      )}
     </div>
   );
 }
